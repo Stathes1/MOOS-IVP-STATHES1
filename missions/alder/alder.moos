@@ -20,7 +20,7 @@ ProcessConfig = ANTLER
   Run = pMarineViewer	@ NewConsole = false
   Run = uProcessWatch @ NewConsole = false
   Run = pHelmIvP      @ NewConsole = false
-  //Run = pOdometry     @ NewConsole = false
+  Run = pOdometry     @ NewConsole = false
 }
 
 //------------------------------------------
@@ -65,6 +65,7 @@ ProcessConfig = pHelmIvP
   CommsTick  = 4
 
   Behaviors  = alder.bhv
+  ivp_behavior_dir = /home/admin/moos-ivp-extend/lib
   Verbose    = quiet
   Domain     = course:0:359:360
   Domain     = speed:0:4:21
@@ -136,7 +137,7 @@ ProcessConfig = pMarineViewer
   appcast_font_size    = small
 
   BUTTON_ONE = DEPLOY # DEPLOY=true
-  BUTTON_ONE = MOOS_MANUAL_OVERIDE=false # RETURN=false
+  BUTTON_ONE = MOOS_MANUAL_OVERRIDE=false # RETURN=false
   BUTTON_TWO = RETURN # RETURN=true
 }
 
@@ -149,4 +150,12 @@ ProcessConfig = pNodeReporter
   CommsTick	= 2
 
   vessel_type = kayak
+}
+//------------------------------------------
+// pOdometry config block
+
+ProcessConfig = pOdometry
+{
+  AppTick   = 4
+  CommsTick = 4
 }

@@ -18,7 +18,7 @@ GenRescue::GenRescue()
   m_nav_x = 0;
   m_nav_y = 0;
 
-  m_update_var = "WPT_UPDATE";
+  m_update_var = "SURVEY_UPDATE";
   m_rescue_request_var = "RESCUE_REQUEST";
   m_request_range = 7.0;
   m_request_repeat = 4.0;

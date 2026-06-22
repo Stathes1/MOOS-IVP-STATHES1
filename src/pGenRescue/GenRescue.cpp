@@ -44,14 +44,20 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
         postPathUpdate();
     }
     else if((key == "NAV_X") && msg.IsDouble()) {
+      bool had_nav = m_got_nav_x && m_got_nav_y;
       m_nav_x = msg.GetDouble();
       m_got_nav_x = true;
+      if(!had_nav && m_got_nav_y && !m_swimmers.empty())
+        postPathUpdate();
     }
     else if((key == "NAV_Y") && msg.IsDouble()) {
+      bool had_nav = m_got_nav_x && m_got_nav_y;
       m_nav_y = msg.GetDouble();
       m_got_nav_y = true;
+      if(!had_nav && m_got_nav_x && !m_swimmers.empty())
+        postPathUpdate();
     }
-    else
+    else if(key != "APPCAST_REQ")
       reportRunWarning("Unhandled Mail: " + key);
   }
 
@@ -89,19 +95,22 @@ bool GenRescue::OnStartUp()
     string value = stripBlankEnds(line);
 
     bool handled = false;
-    if(param == "update_var") {
+    if((param == "update_var") && !strContainsWhite(value) && (value != "")) {
       m_update_var = value;
       handled = true;
     }
-    else if(param == "rescue_request_var") {
+    else if((param == "rescue_request_var") &&
+            !strContainsWhite(value) && (value != "")) {
       m_rescue_request_var = value;
       handled = true;
     }
-    else if((param == "request_range") && isNumber(value)) {
+    else if((param == "request_range") && isNumber(value) &&
+            (atof(value.c_str()) > 0)) {
       m_request_range = atof(value.c_str());
       handled = true;
     }
-    else if((param == "request_repeat") && isNumber(value)) {
+    else if((param == "request_repeat") && isNumber(value) &&
+            (atof(value.c_str()) > 0)) {
       m_request_repeat = atof(value.c_str());
       handled = true;
     }
@@ -113,6 +122,9 @@ bool GenRescue::OnStartUp()
     if(!handled)
       reportUnhandledConfigWarning(orig);
   }
+
+  if(m_vname == "")
+    m_vname = m_Comms.GetCommunityName();
 
   registerVariables();
   return(true);
@@ -172,13 +184,18 @@ bool GenRescue::handleFoundSwimmer(const string& report)
 void GenRescue::postPathUpdate()
 {
   vector<string> order = buildGreedyOrder();
-  if(order.empty())
-    return;
 
   XYSegList segl;
-  for(unsigned int i = 0; i < order.size(); i++) {
-    const Swimmer& swimmer = m_swimmers[order[i]];
-    segl.add_vertex(swimmer.x, swimmer.y);
+  if(order.empty()) {
+    if(!m_got_nav_x || !m_got_nav_y)
+      return;
+    segl.add_vertex(m_nav_x, m_nav_y);
+  }
+  else {
+    for(unsigned int i = 0; i < order.size(); i++) {
+      const Swimmer& swimmer = m_swimmers[order[i]];
+      segl.add_vertex(swimmer.x, swimmer.y);
+    }
   }
 
   Notify(m_update_var, "points=" + segl.get_spec_pts(1));

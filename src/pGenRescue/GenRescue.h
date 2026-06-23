@@ -58,8 +58,9 @@ class GenRescue : public AppCastingMOOSApp
    double candidateScore(const std::string& id,
                          const std::vector<std::string>& remaining,
                          double cx, double cy) const;
-   double closestNeighborDistance(const std::string& id,
-                                  const std::vector<std::string>& remaining) const;
+   double routeLookaheadCost(std::vector<std::string> remaining,
+                             double cx, double cy,
+                             unsigned int depth) const;
    double distTo(double x, double y, double px, double py) const;
    double relBearing(double from_x, double from_y, double heading,
                      double to_x, double to_y) const;
@@ -87,7 +88,8 @@ class GenRescue : public AppCastingMOOSApp
    double m_adversary_concede_range;
    double m_adversary_heading_gate;
    double m_adversary_stale_time;
-   double m_cluster_weight;
+   double m_lookahead_discount;
+   unsigned int m_lookahead_depth;
    unsigned int m_concede_count;
    unsigned int m_updates_posted;
    unsigned int m_requests_posted;

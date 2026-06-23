@@ -34,7 +34,8 @@ GenRescue::GenRescue()
   m_adversary_concede_range = 18.0;
   m_adversary_heading_gate = 65.0;
   m_adversary_stale_time = 8.0;
-  m_cluster_weight = 0.65;
+  m_lookahead_discount = 0.85;
+  m_lookahead_depth = 3;
   m_concede_count = 1;
   m_updates_posted = 0;
   m_requests_posted = 0;
@@ -163,9 +164,19 @@ bool GenRescue::OnStartUp()
       m_adversary_stale_time = atof(value.c_str());
       handled = true;
     }
+    else if((param == "lookahead_discount") && isNumber(value) &&
+            (atof(value.c_str()) >= 0)) {
+      m_lookahead_discount = atof(value.c_str());
+      handled = true;
+    }
+    else if((param == "lookahead_depth") && isNumber(value) &&
+            (atoi(value.c_str()) > 0)) {
+      m_lookahead_depth = (unsigned int)atoi(value.c_str());
+      handled = true;
+    }
     else if((param == "cluster_weight") && isNumber(value) &&
             (atof(value.c_str()) >= 0)) {
-      m_cluster_weight = atof(value.c_str());
+      m_lookahead_discount = atof(value.c_str());
       handled = true;
     }
     else if((param == "concede_count") && isNumber(value) &&
@@ -439,26 +450,44 @@ double GenRescue::candidateScore(const string& id,
   if(m_planner == "greedy")
     return(leg_dist);
 
-  double neighbor_dist = closestNeighborDistance(id, remaining);
-  if(neighbor_dist == numeric_limits<double>::max())
-    neighbor_dist = 0;
+  vector<string> next_remaining = remaining;
+  vector<string>::iterator p = find(next_remaining.begin(), next_remaining.end(), id);
+  if(p != next_remaining.end())
+    next_remaining.erase(p);
 
-  return(leg_dist + (m_cluster_weight * neighbor_dist));
+  if(next_remaining.empty())
+    return(leg_dist);
+
+  unsigned int depth = m_lookahead_depth;
+  if(m_planner == "two_step")
+    depth = 2;
+
+  double future_cost = routeLookaheadCost(next_remaining, swimmer.x, swimmer.y,
+                                          depth - 1);
+  return(leg_dist + (m_lookahead_discount * future_cost));
 }
 
-double GenRescue::closestNeighborDistance(const string& id,
-                                          const vector<string>& remaining) const
+double GenRescue::routeLookaheadCost(vector<string> remaining,
+                                     double cx, double cy,
+                                     unsigned int depth) const
 {
-  const Swimmer& swimmer = m_swimmers.find(id)->second;
-  double best = numeric_limits<double>::max();
+  if(remaining.empty() || (depth == 0))
+    return(0);
 
+  double best = numeric_limits<double>::max();
   for(unsigned int i = 0; i < remaining.size(); i++) {
-    if(remaining[i] == id)
-      continue;
-    const Swimmer& other = m_swimmers.find(remaining[i])->second;
-    double dist = distTo(swimmer.x, swimmer.y, other.x, other.y);
-    if(dist < best)
-      best = dist;
+    const Swimmer& swimmer = m_swimmers.find(remaining[i])->second;
+    double leg_dist = distTo(cx, cy, swimmer.x, swimmer.y);
+
+    vector<string> next_remaining = remaining;
+    next_remaining.erase(next_remaining.begin() + i);
+
+    double score = leg_dist +
+      (m_lookahead_discount *
+       routeLookaheadCost(next_remaining, swimmer.x, swimmer.y, depth - 1));
+
+    if(score < best)
+      best = score;
   }
 
   return(best);
@@ -510,6 +539,8 @@ bool GenRescue::buildReport()
   m_msgs << "Path updates posted: " << m_updates_posted << endl;
   m_msgs << "Rescue requests posted: " << m_requests_posted << endl;
   m_msgs << "Planner: " << m_planner << endl;
+  m_msgs << "Lookahead depth: " << m_lookahead_depth << endl;
+  m_msgs << "Lookahead discount: " << m_lookahead_discount << endl;
   m_msgs << "Request range: " << m_request_range << endl;
   m_msgs << "Path refresh interval: " << m_path_refresh_interval << endl;
   if(contactIsFresh())

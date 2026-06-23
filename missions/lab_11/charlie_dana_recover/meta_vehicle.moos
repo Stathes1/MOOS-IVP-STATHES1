@@ -143,6 +143,10 @@ ProcessConfig = pGenRescue
 
   update_var         = RESCUE_UPDATES
   rescue_request_var = RESCUE_REQUEST
+  planner            = lookahead
+  lookahead_depth    = 3
+  lookahead_discount = 0.85
+  path_refresh_interval = 1.5
   request_range      = 10
   request_repeat     = 4
   vname              = $(VNAME)

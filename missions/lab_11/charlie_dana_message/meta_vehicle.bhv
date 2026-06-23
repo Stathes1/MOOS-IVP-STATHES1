@@ -4,6 +4,7 @@
 initialize   DEPLOY  = false
 initialize   RETURN  = false
 initialize   STATION_KEEP = false
+initialize   RESCUE  = false
 initialize   LOITER  = true
 initialize   AVOID   = true
 
@@ -26,6 +27,11 @@ set MODE = LOITERING {
   LOITER = true
 }
 
+set MODE = RESCUING {
+  MODE = ACTIVE
+  RESCUE = true
+}
+
 
 //----------------------------------------------
 Behavior = BHV_Loiter
@@ -33,6 +39,7 @@ Behavior = BHV_Loiter
   name      = loiter
   pwt       = 100
   condition = MODE==LOITERING
+  condition = RESCUE != true
   updates   = UP_LOITER
   runflag   = VEHICLE_UNDERWAY = true
   endflag   = VEHICLE_UNDERWAY = false
@@ -49,6 +56,24 @@ Behavior = BHV_Loiter
   visual_hints = edge_size=1, vertex_size=2
 }
 
+
+//----------------------------------------------
+Behavior = BHV_Waypoint
+{
+    name      = waypt_rescue
+    pwt       = 100
+    updates   = RESCUE_UPDATES
+    condition = MODE==RESCUING
+    condition = RETURN != true
+    condition = STATION_KEEP != true
+
+      speed = 1.3
+     radius = 3.0
+  nm_radius = 15.0
+      point = $(START_POS)
+     repeat = 0
+       lead = 8
+}
 
 //----------------------------------------------
 Behavior = BHV_Waypoint

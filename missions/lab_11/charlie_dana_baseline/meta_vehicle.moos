@@ -17,6 +17,7 @@ Processconfig = ANTLER
   Run = pNodeReporter    @ NewConsole = false
   Run = pMarinePIDV22    @ NewConsole = false
   Run = pHelmIvP         @ NewConsole = false
+  Run = pGenRescue       @ NewConsole = false
   Run = pHostInfo        @ NewConsole = false
   Run = uFldNodeBroker   @ NewConsole = false
   Run = pRealm           @ NewConsole = false
@@ -75,6 +76,21 @@ ProcessConfig = pHelmIvP
   verbose      = false
   Domain       = course:0:359:360
   Domain       = speed:0:5:26
+}
+
+//----------------------------------------------------
+// pGenRescue config block
+
+ProcessConfig = pGenRescue
+{
+  AppTick   = 4
+  CommsTick = 4
+
+  update_var         = RESCUE_UPDATES
+  rescue_request_var = RESCUE_REQUEST
+  request_range      = 10
+  request_repeat     = 4
+  vname              = $(VNAME)
 }
 
 //-----------------------------------------------------

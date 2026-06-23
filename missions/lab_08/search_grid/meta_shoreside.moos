@@ -1,0 +1,131 @@
+//*******************************************************
+// ShoreSide Configuration File
+
+ServerHost = localhost
+ServerPort = $(VPORT)
+Community  = $(VNAME)
+
+#include plug_origin_warp.moos
+  
+//--------------------------------------------------------
+Processconfig = ANTLER
+{
+  MSBetweenLaunches = 100
+
+  Run = MOOSDB          @ NewConsole = false
+  Run = pRealm          @ NewConsole = false
+  Run = pMarineViewer   @ NewConsole = false
+  Run = pLogger         @ NewConsole = false
+  Run = pShare          @ NewConsole = false
+  Run = pHostInfo       @ NewConsole = false
+  Run = uFldShoreBroker @ NewConsole = false
+  Run = uTimerScript    @ NewConsole = false
+  Run = pSearchGrid     @ NewConsole = false
+  Run = pRealm          @ NewConsole = false
+}
+
+#include plug_pShare.moos
+#include plug_pHostInfo.moos
+#include plug_pLogger.moos
+
+//--------------------------------------------------
+// uFldShoreBroker Configuration Block
+
+ProcessConfig = uFldShoreBroker
+{
+  AppTick       = 1
+  CommsTick     = 1
+
+  qbridge  = DEPLOY, NODE_REPORT
+  qbridge  = STATION_KEEP, APPCAST_REQ
+  qbridge  = MOOS_MANUAL_OVERRIDE, LOITER
+  qbridge  = WPT_UPDATE, RETURN_UPDATE
+
+  bridge   = src=RETURN_ALL, alias=RETURN
+  bridge   = src=RETURN_$V,  alias=RETURN
+}
+
+//--------------------------------------------------------
+ProcessConfig = pMarineViewer
+{
+  AppTick    = 4
+  CommsTick  = 4
+
+  tiff_file            = forrest19.tif
+  set_pan_x            = -90
+  set_pan_y            = -280
+  zoom                 = 0.65
+  vehicles_shape_scale = 1.5
+  vehicles_name_mode   = names+shortmode
+
+	nodes_font_size = xlarge
+	procs_font_size = xlarge
+	appcast_font_size = large
+	
+  point_viewable_labels   = false
+  polygon_viewable_labels = false
+  appcast_viewable     = true
+  appcast_color_scheme = indigo
+  hash_delta           = 50
+  hash_viewable        = true
+  hash_shade           = 0.35
+
+  scope = PHI_HOST_INFO
+  scope = VIEW_GRID
+  scope = VIEW_GRID_DELTA
+
+  button_one   = DEPLOY  # DEPLOY_ALL=true 
+  button_one   = DEPLOY  # LOITER_ALL=false 
+  button_one   = DEPLOY  # RETURN_ALL=false 
+  button_one   = DEPLOY  # STATION_KEEP_ALL=false 
+  button_one   = DEPLOY  # MOOS_MANUAL_OVERRIDE_ALL=false
+
+  button_two   = RETURN  # RETURN_ALL=true
+  button_two   = RETURN  # LOITER_ALL=false
+  button_two   = RETURN  # STATION_KEEP_ALL=false
+
+  button_three = STATION # STATION_KEEP_ALL=true
+  button_three = STATION # LOITER_ALL=false
+
+  button_four  = LOITER  # LOITER_ALL=true
+  button_four  = LOITER  # DEPLOY_ALL=false
+  button_four  = LOITER  # RETURN_ALL=false
+  button_four  = LOITER  # STATION_KEEP_ALL=false
+}
+
+//--------------------------------------------------
+// Post the search region outline into pMarineViewer.
+
+ProcessConfig = uTimerScript
+{
+  AppTick     = 4
+  CommsTick   = 4
+
+  paused      = false
+  reset_max   = 0
+  time_warp   = $(WARP)
+  script_name = lab8_search_region
+
+  event = var=VIEW_SEGLIST, val="pts={-10,0:190,0:190,-140:-10,-140:-10,0},label=search_region,edge_color=yellow,vertex_color=yellow,edge_size=2,vertex_size=3", time=0.25
+  event = var=VIEW_POINT, val="x=0,y=-10,label=G_START,vertex_color=deepskyblue,vertex_size=5", time=0.25
+  event = var=VIEW_POINT, val="x=180,y=-10,label=H_START,vertex_color=limegreen,vertex_size=5", time=0.25
+}
+
+//--------------------------------------------------
+// Count vehicle node reports in each search-grid cell.
+
+ProcessConfig = pSearchGrid
+{
+  AppTick   = 4
+  CommsTick = 4
+
+  report_deltas = true
+  grid_var_name = VIEW_GRID
+  grid_label    = lab8_search
+
+  grid_config = pts={-10,0:190,0:190,-140:-10,-140}
+  grid_config = cell_size=10
+  grid_config = cell_vars=x:0
+  grid_config = cell_min=x:0
+  grid_config = cell_max=x:25
+}

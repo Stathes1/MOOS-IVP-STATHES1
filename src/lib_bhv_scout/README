@@ -2,14 +2,15 @@ BHV_Scout
 =========
 
 This behavior replaces random scouting with deterministic coverage of the
-convex RESCUE_REGION. It evaluates horizontal and vertical boustrophedon
-routes, starts from the lowest-cost direction, and uses fresh NODE_REPORT data
-to bias the initial route toward territory contested by another scout.
+convex RESCUE_REGION. It records the scout's actual traveled trail and
+evaluates rotated, offset boustrophedon routes before every new pass. Candidate
+routes are penalized when they approach remembered trail points, so later
+passes favor previously uncovered portions of the region instead of reversing
+over the same route. Fresh NODE_REPORT data also biases the route toward
+territory contested by another scout.
 
 Every SCOUTED_SWIMMER report is immediately sent to the configured rescue
-teammate as an offboard SWIMMER_ALERT. The coverage pass repeats in reverse so
-missed probabilistic detections receive another opportunity without a long
-reset transit.
+teammate as an offboard SWIMMER_ALERT.
 
 Parameters
 ----------
@@ -18,3 +19,6 @@ Parameters
   capture_radius  Waypoint capture radius in m (default 5)
   lane_spacing    Coverage grid spacing in m (default 28)
   contact_timeout Maximum age of opponent reports in seconds (default 20)
+  history_spacing Distance between remembered trail samples (default 6)
+  revisit_radius  Radius around old trail that candidates avoid (default 24)
+  revisit_weight  Strength of the old-route penalty (default 20)

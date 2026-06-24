@@ -28,7 +28,10 @@ protected:
   IvPFunction* buildFunction();
   bool updateRegion();
   void buildCoverageRoute();
+  std::vector<XYPoint> buildSweepRoute(double, double) const;
   double routeScore(const std::vector<XYPoint>&) const;
+  double distanceToHistory(double, double) const;
+  void recordTrailPosition();
   void handleNodeReport(const std::string&);
   void postViewPoint(bool=true);
   void postViewRoute(bool=true);
@@ -43,6 +46,7 @@ protected:
   XYPolygon m_rescue_region;
   std::string m_region_spec;
   std::vector<XYPoint> m_route;
+  std::vector<XYPoint> m_route_history;
   unsigned int m_route_ix;
   unsigned int m_pass_count;
   std::map<std::string, ScoutContact> m_contacts;
@@ -51,6 +55,9 @@ protected:
   double m_desired_speed;
   double m_lane_spacing;
   double m_contact_timeout;
+  double m_history_spacing;
+  double m_revisit_radius;
+  double m_revisit_weight;
   std::string m_tmate;
 };
 

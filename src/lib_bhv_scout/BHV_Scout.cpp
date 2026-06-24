@@ -22,6 +22,9 @@ BHV_Scout::BHV_Scout(IvPDomain domain) : IvPBehavior(domain)
   m_capture_radius = 5;
   m_lane_spacing = 28;
   m_contact_timeout = 20;
+  m_history_spacing = 6;
+  m_revisit_radius = 24;
+  m_revisit_weight = 20;
   addInfoVars("NAV_X, NAV_Y, RESCUE_REGION");
   addInfoVars("SCOUTED_SWIMMER, NODE_REPORT");
 }
@@ -37,6 +40,12 @@ bool BHV_Scout::setParam(string param, string val)
     return setPosDoubleOnString(m_lane_spacing, val);
   if(param == "contact_timeout")
     return setPosDoubleOnString(m_contact_timeout, val);
+  if(param == "history_spacing")
+    return setPosDoubleOnString(m_history_spacing, val);
+  if(param == "revisit_radius")
+    return setPosDoubleOnString(m_revisit_radius, val);
+  if(param == "revisit_weight")
+    return setPosDoubleOnString(m_revisit_weight, val);
   if(param == "tmate")
     return setNonWhiteVarOnString(m_tmate, val);
   return false;
@@ -78,6 +87,7 @@ IvPFunction *BHV_Scout::onRunState()
   }
   if(!updateRegion())
     return 0;
+  recordTrailPosition();
   if(m_route.empty())
     buildCoverageRoute();
   if(m_route.empty()) {
@@ -94,10 +104,14 @@ IvPFunction *BHV_Scout::onRunState()
   if(hypot(m_ptx-m_osx, m_pty-m_osy) <= m_capture_radius) {
     m_route_ix++;
     if(m_route_ix >= m_route.size()) {
-      reverse(m_route.begin(), m_route.end());
-      m_route_ix = 0;
       m_pass_count++;
       postEventMessage("Coverage pass " + uintToString(m_pass_count) + " complete");
+      m_route.clear();
+      buildCoverageRoute();
+      if(m_route.empty()) {
+        m_pt_set = false;
+        return 0;
+      }
     }
     m_ptx = m_route[m_route_ix].get_vx();
     m_pty = m_route[m_route_ix].get_vy();
@@ -130,6 +144,7 @@ bool BHV_Scout::updateRegion()
   m_rescue_region = region;
   m_region_spec = spec;
   m_route.clear();
+  m_route_history.clear();
   m_route_ix = 0;
   m_pt_set = false;
   return true;
@@ -137,47 +152,16 @@ bool BHV_Scout::updateRegion()
 
 void BHV_Scout::buildCoverageRoute()
 {
-  double minx = m_rescue_region.get_vx(0);
-  double maxx = minx;
-  double miny = m_rescue_region.get_vy(0);
-  double maxy = miny;
-  for(unsigned int i=1; i<m_rescue_region.size(); i++) {
-    minx = min(minx, m_rescue_region.get_vx(i));
-    maxx = max(maxx, m_rescue_region.get_vx(i));
-    miny = min(miny, m_rescue_region.get_vy(i));
-    maxy = max(maxy, m_rescue_region.get_vy(i));
-  }
-
   vector<vector<XYPoint> > candidates;
-  for(unsigned int vertical=0; vertical<2; vertical++) {
-    vector<XYPoint> route;
-    double outer_min = vertical ? minx : miny;
-    double outer_max = vertical ? maxx : maxy;
-    double inner_min = vertical ? miny : minx;
-    double inner_max = vertical ? maxy : maxx;
-    unsigned int lanes = max(1u, (unsigned int)ceil((outer_max-outer_min)/m_lane_spacing));
-    double lane_step = (outer_max-outer_min)/lanes;
-    unsigned int samples = max(1u, (unsigned int)ceil((inner_max-inner_min)/m_lane_spacing));
-    double sample_step = (inner_max-inner_min)/samples;
-
-    for(unsigned int lane=0; lane<lanes; lane++) {
-      vector<XYPoint> row;
-      double outer = outer_min + (lane+0.5)*lane_step;
-      for(unsigned int j=0; j<=samples; j++) {
-        double inner = inner_min + j*sample_step;
-        double x = vertical ? outer : inner;
-        double y = vertical ? inner : outer;
-        if(m_rescue_region.contains(x,y))
-          row.push_back(XYPoint(x,y));
+  const double phases[] = {0.2, 0.5, 0.8};
+  for(unsigned int angle=0; angle<180; angle+=30) {
+    for(unsigned int phase=0; phase<3; phase++) {
+      vector<XYPoint> route = buildSweepRoute(angle, phases[phase]);
+      if(!route.empty()) {
+        candidates.push_back(route);
+        reverse(route.begin(), route.end());
+        candidates.push_back(route);
       }
-      if(lane % 2)
-        reverse(row.begin(), row.end());
-      route.insert(route.end(), row.begin(), row.end());
-    }
-    if(!route.empty()) {
-      candidates.push_back(route);
-      reverse(route.begin(), route.end());
-      candidates.push_back(route);
     }
   }
 
@@ -191,7 +175,56 @@ void BHV_Scout::buildCoverageRoute()
   }
   m_route_ix = 0;
   m_pt_set = false;
-  postEventMessage("Built coverage route with " + uintToString(m_route.size()) + " points");
+  postEventMessage("Built coverage pass " + uintToString(m_pass_count+1) +
+                   " with " + uintToString(m_route.size()) +
+                   " points; remembered trail points=" +
+                   uintToString(m_route_history.size()));
+}
+
+vector<XYPoint> BHV_Scout::buildSweepRoute(double angle, double phase) const
+{
+  double radians = angle * M_PI / 180.0;
+  double c = cos(radians);
+  double s = sin(radians);
+  double min_u = numeric_limits<double>::max();
+  double max_u = -numeric_limits<double>::max();
+  double min_v = numeric_limits<double>::max();
+  double max_v = -numeric_limits<double>::max();
+
+  for(unsigned int i=0; i<m_rescue_region.size(); i++) {
+    double x = m_rescue_region.get_vx(i);
+    double y = m_rescue_region.get_vy(i);
+    double u = x*c + y*s;
+    double v = -x*s + y*c;
+    min_u = min(min_u, u);
+    max_u = max(max_u, u);
+    min_v = min(min_v, v);
+    max_v = max(max_v, v);
+  }
+
+  vector<XYPoint> route;
+  unsigned int lane = 0;
+  double sample_spacing = min(m_lane_spacing, m_revisit_radius/2.0);
+  sample_spacing = max(sample_spacing, 2.0);
+  unsigned int samples =
+    max(1u, (unsigned int)ceil((max_u-min_u)/sample_spacing));
+  double sample_step = (max_u-min_u)/samples;
+
+  for(double v=min_v + phase*m_lane_spacing;
+      v<=max_v; v+=m_lane_spacing, lane++) {
+    vector<XYPoint> row;
+    for(unsigned int j=0; j<=samples; j++) {
+      double u = min_u + j*sample_step;
+      double x = u*c - v*s;
+      double y = u*s + v*c;
+      if(m_rescue_region.contains(x,y))
+        row.push_back(XYPoint(x,y));
+    }
+    if(lane % 2)
+      reverse(row.begin(), row.end());
+    route.insert(route.end(), row.begin(), row.end());
+  }
+  return route;
 }
 
 double BHV_Scout::routeScore(const vector<XYPoint>& route) const
@@ -202,6 +235,17 @@ double BHV_Scout::routeScore(const vector<XYPoint>& route) const
   for(unsigned int i=1; i<route.size(); i++)
     score += hypot(route[i].get_vx()-route[i-1].get_vx(),
                    route[i].get_vy()-route[i-1].get_vy());
+  score *= 0.05;
+
+  if(!m_route_history.empty()) {
+    double overlap = 0;
+    for(unsigned int i=0; i<route.size(); i++) {
+      double distance = distanceToHistory(route[i].get_vx(),
+                                          route[i].get_vy());
+      overlap += max(0.0, m_revisit_radius-distance);
+    }
+    score += m_revisit_weight * overlap / route.size();
+  }
 
   double opponent = numeric_limits<double>::max();
   for(map<string,ScoutContact>::const_iterator p=m_contacts.begin(); p!=m_contacts.end(); ++p) {
@@ -216,6 +260,25 @@ double BHV_Scout::routeScore(const vector<XYPoint>& route) const
   if(opponent < numeric_limits<double>::max())
     score += 0.15 * opponent;
   return score;
+}
+
+double BHV_Scout::distanceToHistory(double x, double y) const
+{
+  double best = numeric_limits<double>::max();
+  for(unsigned int i=0; i<m_route_history.size(); i++)
+    best = min(best, hypot(x-m_route_history[i].get_vx(),
+                           y-m_route_history[i].get_vy()));
+  return best;
+}
+
+void BHV_Scout::recordTrailPosition()
+{
+  if(!m_rescue_region.contains(m_osx, m_osy))
+    return;
+  if(m_route_history.empty() ||
+     hypot(m_osx-m_route_history.back().get_vx(),
+           m_osy-m_route_history.back().get_vy()) >= m_history_spacing)
+    m_route_history.push_back(XYPoint(m_osx, m_osy));
 }
 
 void BHV_Scout::handleNodeReport(const string& report)
